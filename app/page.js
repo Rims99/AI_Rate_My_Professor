@@ -1,95 +1,89 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+"use client"; 
+import { useState } from "react"; // Import React's useState hook
 
 export default function Home() {
+  // State for storing user input query and the answer received from the API
+  const [query, setQuery] = useState("");
+  const [answer, setAnswer] = useState("");
+
+  // State for storing the URL submitted by the user and the scrape status message
+  const [url, setUrl] = useState("");
+  const [scrapeMessage, setScrapeMessage] = useState("");
+
+  // Function to handle the submission of a professor query
+  const handleSubmitQuery = async (e) => {
+    e.preventDefault(); // Prevent the default form submission behavior
+    
+    // Make a POST request to the /api/query endpoint with the user's query
+    const response = await fetch("/api/query", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ userQuery: query }),
+    });
+
+    // Get the answer from the response and update the state
+    const data = await response.json();
+    setAnswer(data.answer);
+  };
+
+  // Function to handle the submission of a URL for scraping
+  const handleSubmitUrl = async (e) => {
+    e.preventDefault(); // Prevent the default form submission behavior
+    
+    // Make a POST request to the /api/scrape endpoint with the URL
+    const response = await fetch("/api/scrape", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ url }),
+    });
+
+    // Get the scrape status message from the response and update the state
+    const data = await response.json();
+    setScrapeMessage(data.message);
+  };
+
   return (
-    <main className={styles.main}>
-      <div className={styles.description}>
-        <p>
-          Get started by editing&nbsp;
-          <code className={styles.code}>app/page.js</code>
-        </p>
-        <div>
-          <a
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className={styles.vercelLogo}
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
-      </div>
+    <div>
+      <h1>Rate My Professor AI Assistant</h1>
 
-      <div className={styles.center}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
+      {/* Form to submit a professor query */}
+      <form onSubmit={handleSubmitQuery}>
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Ask about a professor..."
         />
+        <button type="submit">Ask</button>
+      </form>
+
+      {/* Display the answer received from the API */}
+      <div>
+        <h2>Answer:</h2>
+        <p>{answer}</p>
       </div>
 
-      <div className={styles.grid}>
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Docs <span>-&gt;</span>
-          </h2>
-          <p>Find in-depth information about Next.js features and API.</p>
-        </a>
+      {/* Form to submit a URL for scraping */}
+      <h2>Submit a Professor's Page URL</h2>
+      <form onSubmit={handleSubmitUrl}>
+        <input
+          type="text"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="Enter Rate My Professors URL..."
+        />
+        <button type="submit">Submit</button>
+      </form>
 
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Learn <span>-&gt;</span>
-          </h2>
-          <p>Learn about Next.js in an interactive course with&nbsp;quizzes!</p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Templates <span>-&gt;</span>
-          </h2>
-          <p>Explore starter templates for Next.js.</p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Deploy <span>-&gt;</span>
-          </h2>
-          <p>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
+      {/* Display the scrape status message */}
+      <div>
+        <h2>Scrape Status:</h2>
+        <p>{scrapeMessage}</p>
       </div>
-    </main>
+    </div>
   );
 }
