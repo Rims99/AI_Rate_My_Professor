@@ -1,72 +1,56 @@
-import { NextResponse } from 'next/server';
-import { Pinecone } from '@pinecone-database/pinecone';
-import { TextServiceClient } from '@google-ai/generativelanguage'; // Correct import for the Google API
-import fetch from 'node-fetch';
+import { NextResponse } from "next/server";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Set global fetch to node-fetch
-global.fetch = fetch;
-
-const systemPrompt = `
-You are a rate my professor agent to help students find classes, that takes in user questions and answers them.
-For every user question, the top 3 professors that match the user question are returned.
-Use them to answer the question if needed.
-`;
+// Initialize Gemini client with your API key
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 export async function POST(req) {
-  const data = await req.json();
+  try {
+    const body = await req.json();
+    const userMessage = body.message;
 
-  // Initialize Pinecone client
-  const pc = new Pinecone({
-    apiKey: process.env.PINECONE_API_KEY,
-  });
-  const index = pc.index('rag').namespace('ns1');
+    // Start the chat with the Gemini model
+    const chat = model.startChat({
+      history: [
+        {
+          role: "user",
+          parts: [{ text: userMessage }],
+        },
+      ],
+    });
 
-  // Initialize the Google Generative Language client
-  const client = new TextServiceClient();
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        try {
+          const result = await chat.sendMessage(userMessage);
+          const responseMessage = await result.response.text();
 
-  // Extract the text from the request
-  const text = data.prompt; // Assuming you send a prompt in the request body
+          // Stream the response letter by letter
+          const encoder = new TextEncoder();
+          for (let i = 0; i < responseMessage.length; i++) {
+            controller.enqueue(encoder.encode(responseMessage[i]));
+            await new Promise((resolve) => setTimeout(resolve, 50)); // Add a delay between letters
+          }
 
-  // Generate text embedding
-  const embeddingResponse = await client.embedText({
-    contents: [{ text }],
-    model: 'text-embedding-3-small',
-  });
+          controller.close();
+        } catch (error) {
+          console.error("Error while streaming response:", error);
+          controller.error(error);
+        }
+      },
+    });
 
-  const embedding = embeddingResponse.embeddings[0].embedding;
-
-  // Query Pinecone index
-  const results = await index.query({
-    topK: 5,
-    includeMetadata: true,
-    vector: embedding,
-  });
-
-  // Prepare the result string
-  let resultString = '';
-  results.matches.forEach((match) => {
-    resultString += `
-    Returned Results:
-    Professor: ${match.id}
-    Review: ${match.metadata.review}
-    Subject: ${match.metadata.subject}
-    Stars: ${match.metadata.stars}
-    \n\n`;
-  });
-
-  // Prepare the last message content
-  const lastMessageContent = text + resultString;
-
-  // Create a completion request
-  const completionResponse = await client.generateText({
-    model: 'text-bison-001', // Ensure this model is compatible with Gemini
-    prompt: lastMessageContent,
-    temperature: 0.7,
-    maxOutputTokens: 150,
-    topP: 0.95,
-    topK: 40,
-  });
-
-  // Return the generated response
-  return NextResponse.json({ response: completionResponse });
+    return new Response(readableStream, {
+      headers: {
+        "Content-Type": "text/plain",
+        "Cache-Control": "no-cache",
+      },
+    });
+  } catch (error) {
+    console.error("Error handling POST request:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
+
+
