@@ -1,202 +1,130 @@
-<<<<<<< HEAD
-"use client"; 
-import { useState } from "react"; // Import React's useState hook
+"use client";
+import { useState } from "react";
+import { Box, Button, Stack, TextField, Typography, AppBar, Toolbar, Container } from "@mui/material";
+import { styled, createTheme, ThemeProvider } from "@mui/material/styles";
+
+
+
+const theme = createTheme({
+  palette: { mode: 'dark', background: { default: '#121212', paper: '#1E1E1E' }, text: { primary: '#FFFFFF' }, primary: { main: '#BB86FC' } },
+  typography: { fontFamily: '"Inter", "Arial", sans-serif' },
+});
+
+const Header = styled(AppBar)(({ theme }) => ({
+  backgroundColor: theme.palette.background.paper,
+  color: theme.palette.text.primary,
+  boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.2)',
+  padding: '10px 20px',
+}));
+
+const ChatBox = styled(Stack)(({ theme }) => ({
+  width: '100%',
+  maxWidth: '600px',
+  height: '80vh',
+  borderRadius: '15px',
+  overflow: 'hidden',
+  backgroundColor: theme.palette.background.paper,
+  boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+}));
+
+const MessageBubble = styled(Box)(({ theme, role }) => ({
+  backgroundColor: role === 'assistant' ? theme.palette.background.default : theme.palette.primary.main,
+  color: theme.palette.text.primary,
+  borderRadius: '15px',
+  padding: '12px 20px',
+  maxWidth: '80%',
+  marginBottom: '10px',
+  boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
+}));
+
+const InputContainer = styled(Stack)(({ theme }) => ({
+  padding: '12px',
+  borderTop: `1px solid ${theme.palette.divider}`,
+  backgroundColor: theme.palette.background.default,
+}));
 
 export default function Home() {
-  // State for storing user input query and the answer received from the API
-  const [query, setQuery] = useState("");
-  const [answer, setAnswer] = useState("");
-
-  // State for storing the URL submitted by the user and the scrape status message
-  const [url, setUrl] = useState("");
-  const [scrapeMessage, setScrapeMessage] = useState("");
-
-  // Function to handle the submission of a professor query
-  const handleSubmitQuery = async (e) => {
-    e.preventDefault(); // Prevent the default form submission behavior
-    
-    // Make a POST request to the /api/query endpoint with the user's query
-    const response = await fetch("/api/query", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ userQuery: query }),
-    });
-
-    // Get the answer from the response and update the state
-    const data = await response.json();
-    setAnswer(data.answer);
-  };
-
-  // Function to handle the submission of a URL for scraping
-  const handleSubmitUrl = async (e) => {
-    e.preventDefault(); // Prevent the default form submission behavior
-    
-    // Make a POST request to the /api/scrape endpoint with the URL
-    const response = await fetch("/api/scrape", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ url }),
-    });
-
-    // Get the scrape status message from the response and update the state
-    const data = await response.json();
-    setScrapeMessage(data.message);
-  };
-
-  return (
-    <div>
-      <h1>Rate My Professor AI Assistant</h1>
-
-      {/* Form to submit a professor query */}
-      <form onSubmit={handleSubmitQuery}>
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Ask about a professor..."
-        />
-        <button type="submit">Ask</button>
-      </form>
-
-      {/* Display the answer received from the API */}
-      <div>
-        <h2>Answer:</h2>
-        <p>{answer}</p>
-      </div>
-
-      {/* Form to submit a URL for scraping */}
-      <h2>Submit a Professor's Page URL</h2>
-      <form onSubmit={handleSubmitUrl}>
-        <input
-          type="text"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="Enter Rate My Professors URL..."
-        />
-        <button type="submit">Submit</button>
-      </form>
-
-      {/* Display the scrape status message */}
-      <div>
-        <h2>Scrape Status:</h2>
-        <p>{scrapeMessage}</p>
-      </div>
-    </div>
-  );
-=======
-'use client'
-import { Box, Button, Stack, TextField } from '@mui/material'
-import { useState } from 'react'
-
-export default function Home() {
-  const [messages, setMessages] = useState([
-    {
-      role: 'assistant',
-      content: `Hi! I'm the Rate My Professor support assistant. How can I help you today?`,
-    },
-  ])
-  const [message, setMessage] = useState('')
+  const [messages, setMessages] = useState([{ role: "assistant", content: "Hi! How can I assist you today?" }]);
+  const [input, setInput] = useState("");
+  const [isStreaming, setIsStreaming] = useState(false);
 
   const sendMessage = async () => {
-    if (!message.trim()) return; // Prevent sending empty messages
+    if (!input.trim()) return;
+    setMessages([...messages, { role: "user", content: input }, { role: "assistant", content: "" }]);
+    setInput("");
 
-    setMessages((prevMessages) => [
-      ...prevMessages,
-      { role: 'user', content: message },
-      { role: 'assistant', content: '' },
-    ])
+    if (isStreaming) return;
+    setIsStreaming(true);
 
-    const response = await fetch('/api/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify([...messages, { role: 'user', content: message }]),
-    })
+    try {
+      const response = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: input }) });
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let text = "";
 
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let result = ''
-
-    const processText = async () => {
-      const { done, value } = await reader.read()
-      if (done) {
-        return result
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        text += decoder.decode(value, { stream: true });
+        setMessages(prev => [...prev.slice(0, -1), { role: "assistant", content: text }]);
       }
-      const text = decoder.decode(value || new Uint8Array(), { stream: true })
-      setMessages((prevMessages) => {
-        let lastMessage = prevMessages[prevMessages.length - 1]
-        let otherMessages = prevMessages.slice(0, prevMessages.length - 1)
-        return [
-          ...otherMessages,
-          { ...lastMessage, content: lastMessage.content + text },
-        ]
-      })
-      await processText() // Continue reading
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setIsStreaming(false);
     }
+  };
 
-    await processText() // Start processing
-    setMessage('') // Clear the input field after sending
-  }
+  const handleKeyDown = e => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
 
   return (
-    <Box
-      width="100vw"
-      height="100vh"
-      display="flex"
-      flexDirection="column"
-      justifyContent="center"
-      alignItems="center"
-    >
-      <Stack
-        direction={'column'}
-        width="500px"
-        height="700px"
-        border="1px solid black"
-        p={2}
-        spacing={3}
-      >
-        <Stack
-          direction={'column'}
-          spacing={2}
-          flexGrow={1}
-          overflow="auto"
-          maxHeight="100%"
-        >
-          {messages.map((msg, index) => (
-            <Box
-              key={index}
-              display="flex"
-              justifyContent={msg.role === 'assistant' ? 'flex-start' : 'flex-end'}
-            >
-              <Box
-                bgcolor={msg.role === 'assistant' ? 'primary.main' : 'secondary.main'}
-                color="white"
-                borderRadius={16}
-                p={3}
-              >
-                {msg.content}
-              </Box>
-            </Box>
-          ))}
-        </Stack>
-        <Stack direction={'row'} spacing={2}>
-          <TextField
-            label="Message"
-            fullWidth
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-          />
-          <Button variant="contained" onClick={sendMessage}>
-            Send
-          </Button>
-        </Stack>
-      </Stack>
-    </Box>
-  )
->>>>>>> 1dcbde99f5444b08d9caa63bf2316fa71e4dd03b
+    <ThemeProvider theme={theme}>
+      <Box width="100vw" height="100vh" display="flex" flexDirection="column" bgcolor={theme.palette.background.default}>
+        <Header position="static">
+          <Toolbar>
+            <Typography variant="h5" sx={{ flexGrow: 1, fontWeight: 700 }}>AI Rate My Professor</Typography>
+          </Toolbar>
+        </Header>
+
+        <Box flexGrow={1} display="flex" justifyContent="center" alignItems="center" p={2}>
+          <ChatBox direction="column" spacing={2}>
+            <Stack direction="column" spacing={2} flexGrow={1} overflow="auto" p={2}>
+              {messages.map((msg, idx) => (
+                <Box key={idx} display="flex" justifyContent={msg.role === "assistant" ? "flex-start" : "flex-end"}>
+                  <MessageBubble role={msg.role}>{msg.content}</MessageBubble>
+                </Box>
+              ))}
+            </Stack>
+            <InputContainer direction="row" spacing={2}>
+              <TextField
+                label="Type a message"
+                fullWidth
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                variant="outlined"
+                size="small"
+                multiline
+                rows={2}
+                sx={{ bgcolor: 'background.paper' }}
+              />
+              <Button variant="contained" color="primary" onClick={sendMessage}>Send</Button>
+            </InputContainer>
+          </ChatBox>
+        </Box>
+
+        <Box sx={{ p: 2, display: 'flex', justifyContent: 'center', alignItems: 'center', bgcolor: theme.palette.background.paper, borderTop: `1px solid ${theme.palette.divider}` }}>
+          <Container maxWidth="lg">
+            <Typography variant="body2" color="textSecondary" align="center">© {new Date().getFullYear()} AI Rate My Professor. All rights reserved.</Typography>
+          </Container>
+        </Box>
+      </Box>
+    </ThemeProvider>
+  );
 }
+
